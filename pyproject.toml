@@ -1,0 +1,18 @@
+[project]
+name = "liam-cache"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "pyarrow",
+  "pandas",
+  "boto3",
+  "pyiceberg",
+  "redis"
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
