@@ -8,7 +8,8 @@ class BloomFilter:
         
     def _hash(self, value: str, seed: int) -> int:
         """Hash function with seed"""
-        return hash(f"{value}:{seed}") % self.size
+        # TODO: Consider using a proper hash family like MurmurHash
+        return abs(hash(f"{value}:{seed}")) % self.size
     
     def add(self, value: str):
         """Add value to bloom filter"""
