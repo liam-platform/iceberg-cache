@@ -9,7 +9,8 @@ dependencies = [
   "pandas",
   "boto3",
   "pyiceberg",
-  "redis"
+  "redis",
+  "datafusion>=48.0.0",
 ]
 
 [dependency-groups]
