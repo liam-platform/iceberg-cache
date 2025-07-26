@@ -11,6 +11,7 @@ dependencies = [
   "pyiceberg",
   "redis",
   "datafusion>=48.0.0",
+  "sqlparse>=0.5.3",
 ]
 
 [dependency-groups]

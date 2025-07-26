@@ -1,8 +1,9 @@
 import hashlib
+import json
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 import pyarrow as pa
 
@@ -13,15 +14,51 @@ class CachePolicy(Enum):
     CUSTOM = "custom"
 
 
+class PartitionState(Enum):
+    """States of partition data in the distributed cache"""
+    NOT_CACHED = "not_cached"
+    LOADING = "loading"
+    CACHED_LOCAL = "cached_local"
+    CACHED_REMOTE = "cached_remote"
+    FAILED = "failed"
+
+
 @dataclass
 class PartitionInfo:
-    """Partition information for pruning"""
-    partition_values: Dict[str, Any]
+    """Represents partition metadata from Iceberg with distributed cache awareness"""
+    partition_id: str
+    table_name: str
+    partition_spec: Dict[str, Any]
     file_path: str
-    row_count: int
+    record_count: int
     file_size_bytes: int
-    min_values: Dict[str, Any]
-    max_values: Dict[str, Any]
+    lower_bounds: Dict[str, Any]
+    upper_bounds: Dict[str, Any]
+    data_files: List[str] = field(default_factory=list)
+    manifest_file: str = ""
+    snapshot_id: int = 0
+    
+    def get_cache_key(self) -> str:
+        """Generate unique cache key for this partition"""
+        key_data = {
+            'table': self.table_name,
+            'partition_id': self.partition_id,
+            'snapshot_id': self.snapshot_id,
+            'manifest': self.manifest_file
+        }
+        return hashlib.md5(json.dumps(key_data, sort_keys=True).encode()).hexdigest()
+
+
+@dataclass
+class CacheLocation:
+    """Represents where partition data is cached in the distributed system"""
+    node_id: str
+    node_address: str
+    state: PartitionState
+    cached_at: float
+    access_count: int = 0
+    last_accessed: float = 0.0
+    memory_usage: int = 0
 
 
 @dataclass

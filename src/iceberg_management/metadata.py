@@ -6,8 +6,10 @@ import pyarrow as pa
 import pyarrow.dataset as ds
 from pyiceberg.manifest import DataFile
 
+from iceberg_management.metadata_provider import IcebergMetadataProvider
 
-class IcebergMetadataManager:
+
+class IcebergMetadataManager(IcebergMetadataProvider):
     """Manages Iceberg tavle metadata and file listings"""
     
     def __init__(self, catalog_config: Dict[str, Any]):

@@ -1,9 +1,17 @@
 import pyarrow as pa
 from datafusion import SessionContext
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Set
 
+from core.cache_data_model import PartitionInfo, CacheLocation
 
 class DatafusionError(Exception):
-    """Custom exception to wrap DataFusion-related errors."""
+    """
+    Custom exception to wrap DataFusion-related errors.
+    Attributes:
+        message (str): A human-readable error message.
+        original_exception (Exception, optional): The original exception that triggered this one.
+    """
     
     def __init__(self, message: str, original_exception: Exception):
         super().__init__(message)
@@ -17,6 +25,22 @@ class DatafusionError(Exception):
 
     def __repr__(self):
         return f"{self.__class__.__name__}(message={self.message!r}, original_exception={self.original_exception!r})"
+
+
+@dataclass
+class DistributedQueryPlan:
+    """Enhanced query plan for distributed execution"""
+    query_id: str
+    table_references: Set[str]
+    predicates: List[Dict[str, Any]]
+    projections: List[str]
+    required_partitions: Dict[str, List[PartitionInfo]]
+    partition_locations: Dict[str, List[CacheLocation]]  # partition_key -> locations
+    local_partitions: Dict[str, List[PartitionInfo]]     # Available locally
+    remote_partitions: Dict[str, List[PartitionInfo]]    # Need remote fetch
+    missing_partitions: Dict[str, List[PartitionInfo]]   # Need object store load
+    execution_nodes: Set[str] = field(default_factory=set)
+    estimated_cost: float = 0.0
 
 
 class QueryEngine:
