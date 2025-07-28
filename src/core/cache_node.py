@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import psutil
 import pyarrow as pa
-import pyarrow.compute as pc
 
 from core.arrow_memory_management import ArrowMemoryManager
 from core.bloom_filter import BloomFilter
@@ -108,7 +107,7 @@ class ArrowCacheNode:
             return
         
         # Need to evict some entries
-        current_usage = self.memory_manager.allocated_bytes
+        # current_usage = self.memory_manager.allocated_bytes
         target_free = required_bytes
         
         keys_to_evict = self.current_policy.should_evict(self.cache_entries, target_free)
@@ -203,7 +202,8 @@ class ArrowCacheNode:
         except Exception as e:
             logger.error(f"Failed to load table data: {e}")
             raise
-    
+        
+    # TODO: switch to datafusion
     def execute_query(self, sql: str) -> pa.Table:
         """Execute simple SQL queries (MVP implementation)"""
         # This is a very basic SQL parser for MVP
@@ -251,8 +251,8 @@ class ArrowCacheNode:
                 pa.types.is_date(column.type) or
                 pa.types.is_timestamp(column.type)):
                 try:
-                    min_val = pc.min(column).as_py()
-                    max_val = pc.max(column).as_py()
+                    min_val = column.min()
+                    max_val = column.max()
                     stats[col_name] = (min_val, max_val)
                 except Exception:
                     pass
