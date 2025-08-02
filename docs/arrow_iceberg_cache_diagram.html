@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Distributed Apache Arrow Cache System</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      }
+
+      .title {
+        text-align: center;
+        color: #2c3e50;
+        margin-bottom: 40px;
+        font-size: 28px;
+        font-weight: bold;
+      }
+
+      .architecture-container {
+        position: relative;
+        width: 100%;
+        height: 900px;
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      /* Client Layer */
+      .client-layer {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        height: 80px;
+        background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .client-box {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: bold;
+        color: #2c3e50;
+        text-align: center;
+        min-width: 120px;
+      }
+
+      /* Cache Cluster Manager */
+      .cluster-manager {
+        position: absolute;
+        top: 140px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 300px;
+        height: 120px;
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .cluster-manager h3 {
+        margin: 0;
+        color: white;
+        font-size: 16px;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+      }
+
+      .cluster-manager .components {
+        color: white;
+        font-size: 12px;
+        text-align: center;
+        margin-top: 8px;
+        opacity: 0.9;
+      }
+
+      /* Cache Nodes */
+      .cache-node {
+        position: absolute;
+        width: 280px;
+        height: 380px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        color: white;
+        overflow: hidden;
+      }
+
+      .cache-node-1 {
+        top: 300px;
+        left: 80px;
+      }
+      .cache-node-2 {
+        top: 300px;
+        right: 380px;
+      }
+      .cache-node-3 {
+        top: 300px;
+        right: 80px;
+      }
+
+      .cache-node-header {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 15px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 16px;
+      }
+
+      .memory-layout {
+        padding: 15px;
+        height: calc(100% - 80px);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .memory-section {
+        border-radius: 6px;
+        padding: 10px;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .arrow-pool {
+        background: rgba(46, 204, 113, 0.8);
+        flex: 6;
+      }
+
+      .index-structures {
+        background: rgba(241, 196, 15, 0.8);
+        flex: 2;
+      }
+
+      .system-overhead {
+        background: rgba(231, 76, 60, 0.8);
+        flex: 1;
+      }
+
+      .section-title {
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+
+      .section-items {
+        font-size: 10px;
+        opacity: 0.9;
+      }
+
+      /* Storage Layer */
+      .storage-layer {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        height: 120px;
+        background: linear-gradient(
+          90deg,
+          #ff9a9e 0%,
+          #fecfef 50%,
+          #fecfef 100%
+        );
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .storage-box {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        min-width: 150px;
+        font-weight: bold;
+        color: #2c3e50;
+      }
+
+      .storage-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+
+      /* Arrows and Connections */
+      .arrow {
+        position: absolute;
+        color: #34495e;
+        font-size: 20px;
+        z-index: 10;
+      }
+
+      .arrow-down {
+        top: 110px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      .arrow-down-1 {
+        top: 270px;
+        left: 220px;
+      }
+      .arrow-down-2 {
+        top: 270px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      .arrow-down-3 {
+        top: 270px;
+        right: 220px;
+      }
+      .arrow-up-1 {
+        bottom: 150px;
+        left: 220px;
+      }
+      .arrow-up-2 {
+        bottom: 150px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      .arrow-up-3 {
+        bottom: 150px;
+        right: 220px;
+      }
+
+      /* Data Flow Indicators */
+      .data-flow {
+        position: absolute;
+        background: rgba(52, 152, 219, 0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: bold;
+        z-index: 15;
+      }
+
+      .flow-1 {
+        top: 200px;
+        left: 450px;
+      }
+      .flow-2 {
+        top: 350px;
+        left: 30px;
+        transform: rotate(-90deg);
+      }
+      .flow-3 {
+        top: 350px;
+        right: 30px;
+        transform: rotate(90deg);
+      }
+      .flow-4 {
+        bottom: 180px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      /* Legend */
+      .legend {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        font-size: 12px;
+        width: 200px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        margin-right: 8px;
+      }
+
+      .networking-info {
+        position: absolute;
+        top: 140px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 11px;
+        width: 180px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .networking-info h4 {
+        margin: 0 0 8px 0;
+        color: #2c3e50;
+        font-size: 12px;
+      }
+
+      /* Hover Effects */
+      .cache-node:hover {
+        transform: translateY(-5px);
+        transition: transform 0.3s ease;
+      }
+
+      .client-box:hover,
+      .storage-box:hover {
+        transform: scale(1.05);
+        transition: transform 0.2s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="title">
+        Distributed Apache Arrow Cache System for Iceberg Tables
+      </div>
+
+      <div class="architecture-container">
+        <!-- Client Layer -->
+        <div class="client-layer">
+          <div class="client-box">Spark Integration</div>
+          <div class="client-box">Pandas/PyArrow</div>
+          <div class="client-box">SQL Clients</div>
+          <div class="client-box">Custom Apps</div>
+        </div>
+
+        <!-- Cache Cluster Manager -->
+        <div class="cluster-manager">
+          <h3>Cache Cluster Manager</h3>
+          <div class="components">
+            Service Discovery • Load Balancing<br />
+            Metadata Sync • Health Monitoring
+          </div>
+        </div>
+
+        <!-- Cache Nodes -->
+        <div class="cache-node cache-node-1">
+          <div class="cache-node-header">Cache Node 1</div>
+          <div class="memory-layout">
+            <div class="memory-section arrow-pool">
+              <div class="section-title">Arrow Memory Pool (80%)</div>
+              <div class="section-items">
+                • Table Partitions (RecordBatches)<br />
+                • Column Chunks (Arrow Arrays)<br />
+                • Metadata Buffers
+              </div>
+            </div>
+            <div class="memory-section index-structures">
+              <div class="section-title">Index Structures (10%)</div>
+              <div class="section-items">
+                • Bloom Filters<br />
+                • Min/Max Statistics<br />
+                • Partition Indices
+              </div>
+            </div>
+            <div class="memory-section system-overhead">
+              <div class="section-title">System (10%)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cache-node cache-node-2">
+          <div class="cache-node-header">Cache Node 2</div>
+          <div class="memory-layout">
+            <div class="memory-section arrow-pool">
+              <div class="section-title">Arrow Memory Pool (80%)</div>
+              <div class="section-items">
+                • Table Partitions (RecordBatches)<br />
+                • Column Chunks (Arrow Arrays)<br />
+                • Metadata Buffers
+              </div>
+            </div>
+            <div class="memory-section index-structures">
+              <div class="section-title">Index Structures (10%)</div>
+              <div class="section-items">
+                • Bloom Filters<br />
+                • Min/Max Statistics<br />
+                • Partition Indices
+              </div>
+            </div>
+            <div class="memory-section system-overhead">
+              <div class="section-title">System (10%)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cache-node cache-node-3">
+          <div class="cache-node-header">Cache Node N</div>
+          <div class="memory-layout">
+            <div class="memory-section arrow-pool">
+              <div class="section-title">Arrow Memory Pool (80%)</div>
+              <div class="section-items">
+                • Table Partitions (RecordBatches)<br />
+                • Column Chunks (Arrow Arrays)<br />
+                • Metadata Buffers
+              </div>
+            </div>
+            <div class="memory-section index-structures">
+              <div class="section-title">Index Structures (10%)</div>
+              <div class="section-items">
+                • Bloom Filters<br />
+                • Min/Max Statistics<br />
+                • Partition Indices
+              </div>
+            </div>
+            <div class="memory-section system-overhead">
+              <div class="section-title">System (10%)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Storage Layer -->
+        <div class="storage-layer">
+          <div class="storage-box">
+            <div class="storage-icon">☁️</div>
+            <div>Object Storage</div>
+            <div style="font-size: 10px; opacity: 0.7">
+              S3 • GCS • Azure Blob
+            </div>
+          </div>
+          <div class="storage-box">
+            <div class="storage-icon">🗂️</div>
+            <div>Iceberg Tables</div>
+            <div style="font-size: 10px; opacity: 0.7">
+              Metadata • Manifests
+            </div>
+          </div>
+          <div class="storage-box">
+            <div class="storage-icon">🔧</div>
+            <div>Coordination</div>
+            <div style="font-size: 10px; opacity: 0.7">Consul • Zookeeper</div>
+          </div>
+        </div>
+
+        <!-- Arrows and Data Flow -->
+        <div class="arrow arrow-down">⬇️</div>
+        <div class="arrow arrow-down-1">⬇️</div>
+        <div class="arrow arrow-down-2">⬇️</div>
+        <div class="arrow arrow-down-3">⬇️</div>
+        <div class="arrow arrow-up-1">⬆️</div>
+        <div class="arrow arrow-up-2">⬆️</div>
+        <div class="arrow arrow-up-3">⬆️</div>
+
+        <!-- Data Flow Labels -->
+        <div class="data-flow flow-1">Query Routing</div>
+        <div class="data-flow flow-2">Arrow Flight</div>
+        <div class="data-flow flow-3">gRPC</div>
+        <div class="data-flow flow-4">Data Loading</div>
+
+        <!-- Networking Information -->
+        <div class="networking-info">
+          <h4>Inter-Node Communication</h4>
+          • Arrow Flight (Port 8815)<br />
+          • gRPC Control (Port 8816)<br />
+          • Zero-Copy Transfers<br />
+          • LZ4/Snappy Compression
+        </div>
+
+        <!-- Legend -->
+        <!-- <div class="legend">
+          <h4 style="margin: 0 0 10px 0; color: #2c3e50">Component Legend</h4>
+          <div class="legend-item">
+            <div
+              class="legend-color"
+              style="
+                background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+              "
+            ></div>
+            <span>Client Applications</span>
+          </div>
+          <div class="legend-item">
+            <div
+              class="legend-color"
+              style="
+                background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+              "
+            ></div>
+            <span>Cluster Manager</span>
+          </div>
+          <div class="legend-item">
+            <div
+              class="legend-color"
+              style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              "
+            ></div>
+            <span>Cache Nodes</span>
+          </div>
+          <div class="legend-item">
+            <div
+              class="legend-color"
+              style="
+                background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 100%);
+              "
+            ></div>
+            <span>Storage & Services</span>
+          </div>
+        </div>
+      </div> -->
+
+      <div
+        style="
+          margin-top: 30px;
+          padding: 20px;
+          background: #f8f9fa;
+          border-radius: 10px;
+        "
+      >
+        <h3 style="color: #2c3e50; margin-bottom: 15px">
+          Key Architecture Features
+        </h3>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+          "
+        >
+          <div>
+            <h4 style="color: #3498db; margin-bottom: 8px">
+              🚀 Performance Optimizations
+            </h4>
+            <ul style="font-size: 14px; color: #555">
+              <li>Columnar Arrow format for vectorized processing</li>
+              <li>Predicate pushdown and column pruning</li>
+              <li>Zero-copy network transfers with Arrow Flight</li>
+              <li>Intelligent partition distribution</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="color: #e74c3c; margin-bottom: 8px">
+              💾 Memory Management
+            </h4>
+            <ul style="font-size: 14px; color: #555">
+              <li>Hierarchical Arrow memory pools</li>
+              <li>LRU + Frequency-based eviction</li>
+              <li>Memory pressure handling</li>
+              <li>80/10/10 memory allocation strategy</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="color: #27ae60; margin-bottom: 8px">
+              🔄 Data Consistency
+            </h4>
+            <ul style="font-size: 14px; color: #555">
+              <li>Iceberg metadata synchronization</li>
+              <li>Version-based cache invalidation</li>
+              <li>Schema evolution support</li>
+              <li>Distributed coordination with Zookeeper</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="color: #f39c12; margin-bottom: 8px">
+              ⚡ Query Processing
+            </h4>
+            <ul style="font-size: 14px; color: #555">
+              <li>Partition-aware query routing</li>
+              <li>Parallel execution across nodes</li>
+              <li>Arrow Compute API integration</li>
+              <li>Bloom filter-based pruning</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

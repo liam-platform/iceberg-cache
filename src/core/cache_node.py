@@ -119,52 +119,10 @@ class ArrowCacheNode:
         
         raise MemoryError(f"Cannot allocate {required_bytes} bytes even after eviction")
 
-    # def load_table_partition(self, table_location: str, partition_values: Dict[str, Any] = None, 
-    #                        columns: List[str] = None) -> pa.RecordBatch:
-    #     """Load a table partition into cache"""
-    #     cache_key = self._create_cache_key(table_location, partition_values, columns)
-        
-    #     with self._lock:
-    #         # Check if already cached
-    #         if cache_key in self.cache_entries:
-    #             entry = self.cache_entries[cache_key]
-    #             entry.touch()
-    #             return entry.data
-            
-    #         # Load metadata
-    #         metadata = self.metadata_manager.read_table_metadata(table_location)
-            
-    #         # Get partition info
-    #         if table_location not in self.partition_info_cache:
-    #             self.partition_info_cache[table_location] = \
-    #                 self.metadata_manager.get_partition_info(table_location)
-            
-    #         # Find matching partition
-    #         partition_info = self.partition_info_cache[table_location][0]  # Simplified
-            
-    #         # Load data
-    #         batch = self.data_loader.load_parquet_file(partition_info.file_path, columns)
-            
-    #         # Calculate memory required
-    #         batch_size = batch.nbytes
-            
-    #         # Ensure memory available
-    #         self._ensure_memory_available(batch_size)
-            
-    #         # Create cache entry
-    #         entry = CacheEntry(
-    #             key=cache_key,
-    #             data=batch,
-    #             size_bytes=batch_size,
-    #             partition_info=partition_values
-    #         )
-            
-    #         self.cache_entries[cache_key] = entry
-            
-    #         # Build indices
-    #         self._build_indices(cache_key, batch)
-            
-    #         return batch
+    def load_table_partition(self, table_location: str, partition_values: Optional[Dict[str, Any]] = None, 
+                           columns: Optional[List[str]] = None) -> pa.RecordBatch:
+        """Load a table partition into cache"""
+        pass
     
     def get_table_data(self, table_id: str, 
                       partition_filter: Optional[Dict] = None,
