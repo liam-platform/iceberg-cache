@@ -120,9 +120,48 @@ class ArrowCacheNode:
         raise MemoryError(f"Cannot allocate {required_bytes} bytes even after eviction")
 
     def load_table_partition(self, table_location: str, partition_values: Optional[Dict[str, Any]] = None, 
-                           columns: Optional[List[str]] = None) -> pa.RecordBatch:
+                           columns: Optional[List[str]] = None) -> pa.Table:
         """Load a table partition into cache"""
-        pass
+        cache_key = self._create_cache_key(table_location, partition_values or {}, set(columns) if columns else set())
+        cache_key_str = str(cache_key)
+
+        with self._lock:
+            # Check if already cached
+            if cache_key_str in self.cache_entries:
+                entry = self.cache_entries[cache_key_str]
+                entry.touch()
+                return entry.table
+
+            # Get partition info
+            if table_location not in self.partition_info_cache:
+                self.partition_info_cache[table_location] = self.metadata_manager.get_partition_info(table_location)
+
+            # Find matching partition (simplified: first match)
+            partition_info = self.partition_info_cache[table_location][0]
+
+            # Load data as Arrow Table
+            table = self.data_loader.load_parquet_file(partition_info.file_path, columns)
+
+            # Calculate memory required
+            table_size = table.nbytes
+
+            # Ensure memory available
+            self._ensure_memory_available(table_size)
+
+            # Create cache entry
+            entry = CacheEntry(
+                table=table,
+                timestamp=time.time(),
+                size_bytes=table_size,
+                partition_info=partition_values
+            )
+
+            self.cache_entries[cache_key_str] = entry
+
+            # Build indices
+            self._build_indices(cache_key_str, table)
+
+            return table
     
     def get_table_data(self, table_id: str, 
                       partition_filter: Optional[Dict] = None,

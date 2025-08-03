@@ -1,12 +1,14 @@
-from typing import Any, Dict, Optional, List, Union
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
-from pyiceberg.table import Table 
-from pyiceberg.catalog import load_catalog
 import pyarrow as pa
 import pyarrow.dataset as ds
+from pyiceberg.catalog import load_catalog
 from pyiceberg.manifest import DataFile
+from pyiceberg.table import Table
 from pyiceberg.table.snapshots import Snapshot
+
+from core.cache_data_model import PartitionInfo
 
 
 class IcebergMetadataManager:
@@ -65,7 +67,7 @@ class IcebergMetadataManager:
 
         # Apply partition filter if provided
         if partition_filter:
-            from pyiceberg.expressions import EqualTo, And
+            from pyiceberg.expressions import And, EqualTo
             filter_expr = None
             for key, value in partition_filter.items():
                 condition = EqualTo(key, value)
@@ -328,3 +330,37 @@ class IcebergMetadataManager:
             "cached_snapshots": len(self._snapshot_cache)
         }
     
+    def read_table_metadata(self, table_id: str) -> Dict[str, Any]:
+        """Return basic metadata for the table: schema, location, current snapshot."""
+        table = self.get_table(table_id)
+        current_snapshot = table.current_snapshot()
+        return {
+            "table_id": table_id,
+            "schema": table.schema(),
+            "location": table.location(),
+            "current_snapshot_id": current_snapshot.snapshot_id if current_snapshot else None,
+            "summary": current_snapshot.summary if current_snapshot else None,
+        }
+
+    def get_partition_info(self, table_id: str) -> List[PartitionInfo]:
+        """Return a list of PartitionInfo objects for all partitions in the table."""
+        table = self.get_table(table_id)
+        partition_infos = []
+        # Get all data files for the current snapshot
+        data_files = self.get_data_files(table_id)
+        for df in data_files:
+            partition_info = PartitionInfo(
+                partition_id=getattr(df, 'partition_id', ''),
+                table_name=table_id,
+                partition_spec=getattr(df, 'partition', {}),
+                file_path=df.file_path,
+                record_count=getattr(df, 'record_count', 0),
+                file_size_bytes=getattr(df, 'file_size_in_bytes', 0),
+                lower_bounds=getattr(df, 'lower_bounds', {}),
+                upper_bounds=getattr(df, 'upper_bounds', {}),
+                data_files=[df.file_path],
+                manifest_file=getattr(df, 'manifest_path', ''),
+                snapshot_id=getattr(df, 'snapshot_id', 0)
+            )
+            partition_infos.append(partition_info)
+        return partition_infos
