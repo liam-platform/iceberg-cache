@@ -13,8 +13,32 @@ class ArrowFlightServer(flight.FlightServerBase):
     
     def list_flights(self, context, criteria):
         """List available tables"""
-        # TODO: implement this method
-        pass
+        # Get all table names from Iceberg
+        def _is_identifier(x) -> bool:
+            return isinstance(x, tuple) and all(isinstance(item, str) for item in x)
+        
+        namespace = "default" # FIXME: configurable namespace
+        table_names = self.cache_node.metadata_manager.catalog.list_tables(namespace=namespace)
+        for table_id in table_names:
+            if isinstance(table_id, str):
+                schema = self.cache_node.metadata_manager.get_schema(table_id=table_id)
+                descriptor = flight.FlightDescriptor.for_path(table_id.encode())
+                endpoint = flight.FlightEndpoint(
+                    ticket=flight.Ticket(table_id.encode()),
+                    locations=[Location.for_grpc_tcp("localhost", 8815)]
+                )
+                yield flight.FlightInfo(
+                    schema=schema,
+                    descriptor=descriptor,
+                    endpoints=[endpoint],
+                    total_records=-1,
+                    total_bytes=-1
+                )
+            elif _is_identifier(table_id):
+                # FIXME: handle Identifier case
+                continue
+            else:
+                raise ValueError("table_id must be either str or Tuple[str,...]")
     
     def get_flight_info(self, context, descriptor):
         """Get flight info for a table"""
