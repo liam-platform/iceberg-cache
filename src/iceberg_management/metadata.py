@@ -95,14 +95,15 @@ class IcebergMetadataManager:
             PyArrow schema
         """
         table = self.get_table(table_id)
-        
+
         if snapshot_id is not None or as_of_timestamp is not None:
             snapshot = self.get_snapshot(table_id, snapshot_id, as_of_timestamp)
             if snapshot:
-                # Get schema from snapshot's manifest
-                return table.schema()
-        
-        return table.schema()
+                # PyIceberg schema → PyArrow schema
+                return table.schema().as_arrow()
+
+        # PyIceberg schema → PyArrow schema
+        return table.schema().as_arrow()
 
     def list_tables(self) -> Optional[List[pa.Table]]:
         """Get all iceberg tables and return as arrow Tables."""

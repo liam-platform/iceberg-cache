@@ -17,28 +17,34 @@ class ArrowFlightServer(flight.FlightServerBase):
         def _is_identifier(x) -> bool:
             return isinstance(x, tuple) and all(isinstance(item, str) for item in x)
         
-        namespace = "default" # FIXME: configurable namespace
+        namespace = "default"  # TODO: make namespace configurable via CacheConfig
         table_names = self.cache_node.metadata_manager.catalog.list_tables(namespace=namespace)
         for table_id in table_names:
+            # Normalise to a dot-separated string regardless of whether the
+            # catalog returns a plain str or a tuple identifier.
             if isinstance(table_id, str):
-                schema = self.cache_node.metadata_manager.get_schema(table_id=table_id)
-                descriptor = flight.FlightDescriptor.for_path(table_id.encode())
-                endpoint = flight.FlightEndpoint(
-                    ticket=flight.Ticket(table_id.encode()),
-                    locations=[Location.for_grpc_tcp("localhost", 8815)]
-                )
-                yield flight.FlightInfo(
-                    schema=schema,
-                    descriptor=descriptor,
-                    endpoints=[endpoint],
-                    total_records=-1,
-                    total_bytes=-1
-                )
+                full_id = table_id
             elif _is_identifier(table_id):
-                # FIXME: handle Identifier case
-                continue
+                full_id = ".".join(table_id)
             else:
-                raise ValueError("table_id must be either str or Tuple[str,...]")
+                raise ValueError(
+                    f"Unexpected table_id type {type(table_id)!r}: {table_id!r}"
+                )
+
+            # get_schema now returns pa.Schema (Iceberg schema converted via .as_arrow())
+            schema = self.cache_node.metadata_manager.get_schema(table_id=full_id)
+            descriptor = flight.FlightDescriptor.for_path(full_id.encode())
+            endpoint = flight.FlightEndpoint(
+                ticket=flight.Ticket(full_id.encode()),
+                locations=[Location.for_grpc_tcp("localhost", 8815)],
+            )
+            yield flight.FlightInfo(
+                schema=schema,
+                descriptor=descriptor,
+                endpoints=[endpoint],
+                total_records=-1,
+                total_bytes=-1,
+            )
     
     def get_flight_info(self, context, descriptor):
         """Get flight info for a table"""
