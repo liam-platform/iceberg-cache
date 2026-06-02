@@ -1,21 +1,23 @@
 import logging
 import threading
 import time
-from typing import Any, Dict, Optional, OrderedDict
+from typing import Any, Dict, List, Optional, OrderedDict
 
 import pyarrow as pa
 
 from core.cache_data_model import CacheEntry
 from core.cache_strategies import CacheStrategy
+from core.eviction_policy import EvictionPolicy
 
 logger = logging.getLogger(__name__)
 
 
 class LRUCache(CacheStrategy):
-    """Baseline LRU Cache with size limits."""
+    """LRU cache whose admission path is owned by a single eviction policy."""
 
-    def __init__(self, max_size_bytes: int = 2 * 1024 * 1024 * 1024) -> None:  # 2GB by default
+    def __init__(self, max_size_bytes: int, eviction_policy: EvictionPolicy) -> None:
         self.max_size_bytes = max_size_bytes
+        self.eviction_policy = eviction_policy
         self.current_size_bytes = 0
         self.cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self.lock = threading.RLock()
@@ -26,7 +28,6 @@ class LRUCache(CacheStrategy):
             if key in self.cache:
                 entry = self.cache[key]
                 entry.touch()
-                # Move to end (most recently used)
                 self.cache.move_to_end(key)
                 logger.info(f"Cache HIT for key {key}")
                 return entry.table
@@ -35,31 +36,43 @@ class LRUCache(CacheStrategy):
             return None
 
     def get_entry(self, key: str) -> Optional[CacheEntry]:
-        """Peek at a cache entry without updating LRU order.
-
-        Use this when you need the full CacheEntry metadata (e.g. last_accessed,
-        access_count) without side-effects on eviction ordering.
-        """
+        """Peek at a cache entry without updating LRU order."""
         with self.lock:
             return self.cache.get(key)
 
-    def put(self, key: str, table: pa.Table) -> None:
-        """Put item in cache with LRU eviction if needed."""
+    def put(self, key: str, table: pa.Table) -> List[str]:
+        """Store table, evicting via policy if needed.
+
+        Returns the keys of any entries that were displaced to make room.
+        Raises MemoryError if the table cannot fit even after full eviction.
+        """
         size_bytes = table.nbytes
         with self.lock:
-            # Remove existing entry if present so we don't double-count
+            evicted_keys: List[str] = []
+
+            # Remove existing entry so we don't double-count its size
             if key in self.cache:
                 old_entry = self.cache[key]
                 self.current_size_bytes -= old_entry.size_bytes
                 del self.cache[key]
 
-            # Evict LRU items until there is room
-            while (self.current_size_bytes + size_bytes > self.max_size_bytes) and len(self.cache) > 0:
-                lru_key, lru_entry = self.cache.popitem(last=False)
-                self.current_size_bytes -= lru_entry.size_bytes
-                logger.info(f"Evicted {lru_key} ({lru_entry.size_bytes} bytes)")
+            bytes_to_free = (self.current_size_bytes + size_bytes) - self.max_size_bytes
+            if bytes_to_free > 0:
+                keys_to_evict = self.eviction_policy.should_evict(dict(self.cache), bytes_to_free)
+                for evict_key in keys_to_evict:
+                    if evict_key in self.cache:
+                        evicted_entry = self.cache.pop(evict_key)
+                        self.current_size_bytes -= evicted_entry.size_bytes
+                        evicted_keys.append(evict_key)
+                        logger.info(f"Evicted {evict_key} ({evicted_entry.size_bytes} bytes)")
 
-            # Add new entry
+                if self.current_size_bytes + size_bytes > self.max_size_bytes:
+                    raise MemoryError(
+                        f"Cannot store {size_bytes} bytes: "
+                        f"{self.current_size_bytes} in use of {self.max_size_bytes} max "
+                        f"after evicting {len(evicted_keys)} entries"
+                    )
+
             entry = CacheEntry(
                 table=table,
                 timestamp=time.time(),
@@ -69,6 +82,7 @@ class LRUCache(CacheStrategy):
             self.cache[key] = entry
             self.current_size_bytes += size_bytes
             logger.info(f"Cached {key} ({size_bytes} bytes), total: {self.current_size_bytes}")
+            return evicted_keys
 
     def delete(self, key: str) -> Optional[int]:
         """Remove a single entry.
