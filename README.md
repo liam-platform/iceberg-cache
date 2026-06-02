@@ -37,6 +37,17 @@ ArrowCacheNode             ← core: unified LRU store, eviction, index structur
 
 **Transport**: `ArrowFlightServer` wraps a cache node and exposes `list_flights` / `get_flight_info` / `do_get` over Arrow Flight gRPC on port 8815. Data is streamed as Arrow record batches (10k rows/batch), avoiding any intermediate serialization.
 
+## Stress test
+Refer to `stress_tests` module for more details of how stress test can be configured and executed. A quick glance on the performance of all the stress test scenarios running on a 16GB Mac Mini M4 can be found below:
+
+| Scenario | Typical throughput | p99 latency |
+|---|---|---|
+| `cache_throughput` | ~1.7 M ops/s | < 1 ms |
+| `memory_pressure` | ~1.3 M ops/s | < 1 ms |
+| `concurrent_access` | ~300 K ops/s | < 1 ms |
+| `eviction_benchmark` | ~1.5 M ops/s | — |
+| `minio_data_loader` | ~500 ops/s (S3-bound) | — |
+
 ## Stack
 
 - [PyIceberg](https://py.iceberg.apache.org/) — catalog and metadata resolution
