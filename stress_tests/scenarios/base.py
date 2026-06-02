@@ -8,6 +8,9 @@ from stress_tests.metrics import ScenarioResult
 class BaseScenario(abc.ABC):
     name: str = "unnamed"
     requires_docker: bool = False
+    # "correctness" — invariants must hold, any failure is a bug.
+    # "stress"      — designed to find breaking points; graceful failure is a pass.
+    category: str = "correctness"
 
     def setup(self) -> None:
         """Called once before run(). Override to allocate resources."""
