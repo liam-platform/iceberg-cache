@@ -38,26 +38,28 @@ class ArrowCacheNode:
 
         self.config = config
 
-        # --- single, unified cache store ---
-        # Previously there were two separate stores (self.cache + self.cache_entries)
-        # that were never synchronised.  Now every path reads/writes through
-        # self.cache only.
-        self.cache = LRUCache(max_size_bytes=config.get("max_cache_size", 2 * 1024 * 1024 * 1024))
-
-        self.metadata_manager = IcebergMetadataManager(config["iceberg_catalog"])
-        self.data_loader = S3DataLoader(config["aws"])
-        self.memory_manager = ArrowMemoryManager(max_memory_bytes)
-
-        # Partition metadata cache (table_location -> list[PartitionInfo])
-        self.partition_info_cache: Dict[str, List[PartitionInfo]] = {}
-
-        # Eviction policy
+        # Eviction policy — set up before LRUCache so it can be passed in
         self.eviction_policies = {
             CachePolicy.LRU: LRUEvictionPolicy(),
             CachePolicy.LFU: LFUEvictionPolicy(),
             CachePolicy.CUSTOM: CustomEvictionPolicy(),
         }
         self.current_policy = self.eviction_policies[cache_policy]
+
+        # Single cache store with a single memory budget (max_memory_bytes).
+        # The eviction policy lives here — no separate ArrowMemoryManager counter.
+        self.cache = LRUCache(
+            max_size_bytes=max_memory_bytes,
+            eviction_policy=self.current_policy,
+        )
+
+        self.metadata_manager = IcebergMetadataManager(config["iceberg_catalog"])
+        self.data_loader = S3DataLoader(config["aws"])
+        # ArrowMemoryManager is kept for pool diagnostics only (no allocate/deallocate).
+        self.memory_manager = ArrowMemoryManager(max_memory_bytes)
+
+        # Partition metadata cache (table_location -> list[PartitionInfo])
+        self.partition_info_cache: Dict[str, List[PartitionInfo]] = {}
 
         # Index structures
         self.bloom_filters: Dict[str, BloomFilter] = {}
@@ -112,14 +114,16 @@ class ArrowCacheNode:
     # ------------------------------------------------------------------
 
     def _evict_entry(self, key: str) -> None:
-        """Evict a single cache entry and update the memory manager."""
+        """Evict a single cache entry (used by TTL maintenance)."""
         freed = self.cache.delete(key)
         if freed is not None:
-            self.memory_manager.deallocate(freed)
-            # Also clean up index structures
-            self.bloom_filters.pop(key, None)
-            self.min_max_stats.pop(key, None)
+            self._cleanup_index(key)
             logger.info(f"Evicted cache entry: {key}")
+
+    def _cleanup_index(self, key: str) -> None:
+        """Remove Bloom filter and min/max stats for a cache key."""
+        self.bloom_filters.pop(key, None)
+        self.min_max_stats.pop(key, None)
 
     def _create_cache_key(
         self, table_id: str, partition_spec: Dict, columns: Set[str]
@@ -127,25 +131,6 @@ class ArrowCacheNode:
         """Create a cache key from parameters."""
         partition_str = json.dumps(partition_spec, sort_keys=True) if partition_spec else "{}"
         return CacheKey(table_id, partition_str, columns)
-
-    def _ensure_memory_available(self, required_bytes: int) -> None:
-        """Ensure sufficient memory is available, evicting entries if necessary."""
-        if self.memory_manager.allocate(required_bytes):
-            return
-
-        # Run eviction policy against a snapshot of current entries
-        keys_to_evict = self.current_policy.should_evict(
-            self.cache.entries(), required_bytes
-        )
-
-        for key in keys_to_evict:
-            self._evict_entry(key)
-            if self.memory_manager.allocate(required_bytes):
-                return
-
-        raise MemoryError(
-            f"Cannot allocate {required_bytes} bytes even after eviction"
-        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -196,15 +181,12 @@ class ArrowCacheNode:
 
             # --- load from object store ---
             table = self.data_loader.load_parquet_file(partition_info.file_path, columns)
-            table_size = table.nbytes
 
-            # Ensure memory is available (may evict other entries)
-            self._ensure_memory_available(table_size)
+            # put() owns the admission decision: evicts via policy, returns displaced keys
+            evicted_keys = self.cache.put(cache_key_str, table)
+            for evicted_key in evicted_keys:
+                self._cleanup_index(evicted_key)
 
-            # Store in the unified cache
-            self.cache.put(cache_key_str, table)
-
-            # Build auxiliary indices
             self._build_indices(cache_key_str, table)
 
             return table
@@ -235,7 +217,9 @@ class ArrowCacheNode:
                 [file.file_path for file in files], columns
             )
 
-            self.cache.put(cache_key_str, table)
+            evicted_keys = self.cache.put(cache_key_str, table)
+            for evicted_key in evicted_keys:
+                self._cleanup_index(evicted_key)
             return table
 
         except Exception as e:
@@ -319,11 +303,8 @@ class ArrowCacheNode:
         accounting, OrderedDict ordering) stays consistent without reaching
         into private attributes.
         """
-        # Cache keys start with "<table_id>#"
-        count = self.cache.invalidate_prefix(f"{table_id}#")
-        # Also clean up index structures for this table's keys
-        keys_to_drop = [k for k in list(self.bloom_filters) if k.startswith(f"{table_id}#")]
-        for k in keys_to_drop:
-            self.bloom_filters.pop(k, None)
-            self.min_max_stats.pop(k, None)
+        prefix = f"{table_id}#"
+        count = self.cache.invalidate_prefix(prefix)
+        for k in [k for k in list(self.bloom_filters) if k.startswith(prefix)]:
+            self._cleanup_index(k)
         logger.info(f"Invalidated {count} cache entries for table '{table_id}'")
