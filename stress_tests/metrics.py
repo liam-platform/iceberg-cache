@@ -25,11 +25,21 @@ class ScenarioResult:
             f"  [{status}]  {self.name:<36}"
             f"  {self.duration_s:>6.2f}s"
             f"  {self.ops_per_sec:>8,.0f} ops/s"
-            f"  p50={self.p50_ms:>5.1f}ms"
-            f"  p99={self.p99_ms:>5.1f}ms"
+            f"  p50={_fmt_latency(self.p50_ms)}"
+            f"  p99={_fmt_latency(self.p99_ms)}"
             f"  hit={self.cache_hit_rate*100:>4.0f}%"
             f"  evict={self.evictions}"
         )
+
+
+def _fmt_latency(ms: float) -> str:
+    """Format a latency value, switching to µs when sub-millisecond."""
+    us = ms * 1000
+    if us < 1.0:
+        return "  <1µs"
+    if ms < 1.0:
+        return f"{us:>4.0f}µs"
+    return f"{ms:>4.1f}ms"
 
 
 class LatencyTracker:

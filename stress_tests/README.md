@@ -35,15 +35,12 @@ The M4 chip's unified memory architecture gives the CPU and Arrow memory pool ac
 ./run_stress_test.sh --cache-mb 2048   # 2 GB cache
 ```
 
-**Expected throughput on M4.** In-memory operations run in the millions of ops/second range. The numbers below are representative baselines from a 16 GB M4 Mac; significant regressions should be visible within the first run after a change.
+**Reading the output.** Each run prints live measurements — throughput, latency percentiles, hit rate, and eviction count. Use those numbers as your baseline. In-memory scenarios (no I/O) typically run in the millions of ops/second on M4; the MinIO scenario is network-bound and will be orders of magnitude slower. A significant drop in ops/s or a jump in p99 after a code change is the signal to investigate.
 
-| Scenario | Typical throughput | p99 latency |
-|---|---|---|
-| `cache_throughput` | ~1.7 M ops/s | < 1 ms |
-| `memory_pressure` | ~1.3 M ops/s | < 1 ms |
-| `concurrent_access` | ~300 K ops/s | < 1 ms |
-| `eviction_benchmark` | ~1.5 M ops/s | — |
-| `minio_data_loader` | ~500 ops/s (S3-bound) | — |
+```
+  [PASS]  cache_throughput         0.01s  1,769,652 ops/s  p50=<1µs  p99= 2µs  hit= 55%  evict=22
+  [PASS]  minio_data_loader        0.04s        507 ops/s  p50=<1µs  p99=<1µs  hit=100%  evict=0
+```
 
 **Docker Desktop on Apple Silicon.** Use Docker Desktop ≥ 4.30 with the `Use Rosetta for x86_64/amd64 emulation` setting disabled — native ARM images are used for both `minio/minio` and `minio/mc`.
 
