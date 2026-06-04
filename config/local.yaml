@@ -1,0 +1,29 @@
+# Local development configuration
+# Prerequisites: docker compose up -d (starts MinIO on port 9000)
+
+iceberg_catalog:
+  type: sql
+  # Relative to project root; seed_data.py and main.py both resolve this
+  uri: sqlite:///local-data/catalog.db
+  warehouse: s3://warehouse/
+  # PyIceberg S3 config for MinIO (no TLS, path-style access)
+  s3.endpoint: localhost:9000
+  s3.ssl-enabled: "false"
+  s3.path-style-access: "true"
+  s3.access-key-id: minioadmin
+  s3.secret-access-key: minioadmin
+  s3.region: us-east-1
+
+aws:
+  endpoint_url: http://localhost:9000
+  aws_access_key_id: minioadmin
+  aws_secret_access_key: minioadmin
+  region_name: us-east-1
+
+server:
+  host: 0.0.0.0
+  port: 8815
+
+cache:
+  max_memory_mb: 512
+  policy: lru
