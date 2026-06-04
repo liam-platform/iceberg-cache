@@ -14,3 +14,6 @@ wheels/
 docs/poc
 local-dev
 docs/mvp.md
+
+# Local development data (Iceberg SQLite catalog + MinIO seed artifacts)
+local-data/
