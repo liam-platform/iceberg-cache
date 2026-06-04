@@ -102,7 +102,7 @@ In a **second terminal**:
 uv run python src/examples/client/demo.py
 ```
 
-Expected output (numbers vary by machine):
+Output (latency numbers depend on your machine and MinIO locality):
 ```
 iceberg-cache demo
 Connecting to grpc://localhost:8815... OK  (2 tables available)
@@ -112,21 +112,23 @@ Warm reads per table: 10
 ────────────────────────────────────────────────────────
 
   Table: default.orders
-    cold read              1 823.4 ms  ████████████████████████████████████
-    cache hit p50              2.1 ms  ▌
-    cache hit p95              3.0 ms  ▌
-    speedup: 868×
+    cold read              <cold_ms> ms  ████…
+    cache hit p50          <hit_ms>  ms  ▌
+    cache hit p95          <hit_ms>  ms  ▌
+    speedup: <N>×
 
   Table: default.events
-    cold read              4 291.7 ms  ████████████████████████████████████████
-    cache hit p50              5.8 ms  ██
-    cache hit p95              7.2 ms  ██
-    speedup: 740×
+    cold read              <cold_ms> ms  ████…
+    cache hit p50          <hit_ms>  ms  ██
+    cache hit p95          <hit_ms>  ms  ██
+    speedup: <N>×
 
 ────────────────────────────────────────────────────────
 Tip: cold read = S3 round-trip + Parquet decode.
       cache hit = Arrow in-memory copy, no I/O.
 ```
+
+**What to expect:** cold reads hit MinIO over localhost (typically hundreds of milliseconds for 100k–300k rows); cache hits serve from Arrow memory and should be single-digit milliseconds regardless of table size. The speedup ratio is the interesting signal — run `--runs 20` for more stable percentiles.
 
 ---
 
